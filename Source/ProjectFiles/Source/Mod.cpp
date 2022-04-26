@@ -7,6 +7,8 @@
 *************************************************************/
 float TickRate = 1;
 
+// Unique Mod IDS
+//********************************
 const int PaintBlock = 3022;
 const int UndoBlock = 3023;
 const int Marker1Block = 3024;
@@ -14,15 +16,10 @@ const int Marker2Block = 3025;
 const int MaskBlock = 3026;
 const int AirFilter = 3027;
 
-CoordinateInBlocks marker1Cord;
-CoordinateInBlocks marker2Cord;
-CoordinateInBlocks maskCord;
-CoordinateInBlocks paintCord;
-
-bool maskBlockPlaced = false;
-
 UniqueID ThisModUniqueIDs[] = { PaintBlock, UndoBlock, Marker1Block, Marker2Block, MaskBlock };
 
+// Data Structs
+//********************************
 struct HistoryBlock {
 	BlockInfo blockInfo;
 	CoordinateInBlocks location;
@@ -33,8 +30,19 @@ struct HistoryBlock {
 	}
 };
 
+// State Variables
+//********************************
+CoordinateInBlocks marker1Cord;
+CoordinateInBlocks marker2Cord;
+CoordinateInBlocks maskCord;
+CoordinateInBlocks paintCord;
+
+bool maskBlockPlaced = false;
+
 std::list<HistoryBlock> lastPaintOperation;
 
+// Utility Methods
+//********************************
 CoordinateInBlocks GetSmallVector(CoordinateInBlocks cord1, CoordinateInBlocks cord2) {
 	int64_t x = (cord1.X < cord2.X) ? cord1.X : cord2.X;
 	int64_t y = (cord1.Y < cord2.Y) ? cord1.Y : cord2.Y;
@@ -50,6 +58,8 @@ CoordinateInBlocks GetLargeVector(CoordinateInBlocks cord1, CoordinateInBlocks c
 	return CoordinateInBlocks(x, y, z);
 }
 
+// Masking Methods
+//********************************
 std::list<BlockInfo> GetMaskBlocks()
 {
 	std::list<BlockInfo> maskBlocks;
@@ -72,46 +82,17 @@ bool BlockIsMaskTarget(BlockInfo info, std::list<BlockInfo> mask) {
 	return false;
 }
 
+// Paint Methods
+//********************************
 void PaintArea() {
 	bool useMask = false;
 	std::list<BlockInfo> maskBlocks;
-	BlockInfo targetBlock;
 
-	// Markers must within loaded chunks
-	if (GetBlock(marker1Cord).Type == EBlockType::Invalid) {
-		SpawnHintText(
-			GetPlayerLocation(),
-			L"Marker 1 Not Found",
-			1,
-			1,
-			1
-		);
-		return;
-	}
-	if (GetBlock(marker2Cord).Type == EBlockType::Invalid) {
-		SpawnHintText(
-			GetPlayerLocation(),
-			L"Marker 2 Not Found",
-			1,
-			1,
-			1
-		);
-		return;
-	}
-	// Set the paint target
-	if (GetBlock(paintCord).Type == EBlockType::Invalid) {
-		SpawnHintText(
-			GetPlayerLocation(),
-			L"Paint Block Not Found",
-			1,
-			1,
-			1
-		);
-		return;
-	}
-	else {
-		targetBlock = GetBlock(CoordinateInBlocks(paintCord.X, paintCord.Y, paintCord.Z + 1));
-	}
+	if (!MarkersInLoadedChunks) return;
+
+	BlockInfo targetBlock = SetPaintTarget();
+	if (targetBlock.Type == EBlockType::Invalid) return;
+
 	// Set the block mask if one exists
 	if (maskBlockPlaced && !(GetBlock(maskCord).Type == EBlockType::Invalid)) {
 		maskBlocks = GetMaskBlocks();
@@ -144,17 +125,60 @@ void PaintArea() {
 	}
 }
 
+bool MarkersInLoadedChunks() {
+	if (GetBlock(marker1Cord).Type == EBlockType::Invalid) {
+		SpawnHintText(
+			GetPlayerLocation(),
+			L"Marker 1 Not Found",
+			1,
+			1,
+			1
+		);
+		return false;
+	}
+	if (GetBlock(marker2Cord).Type == EBlockType::Invalid) {
+		SpawnHintText(
+			GetPlayerLocation(),
+			L"Marker 2 Not Found",
+			1,
+			1,
+			1
+		);
+		return false;
+	}
+	return true;
+}
+
+BlockInfo SetPaintTarget() {
+	if (GetBlock(paintCord).Type == EBlockType::Invalid) {
+		SpawnHintText(
+			GetPlayerLocation(),
+			L"Paint Block Not Found",
+			1,
+			1,
+			1
+		);
+		return BlockInfo(EBlockType::Invalid);
+	}
+	else {
+		return GetBlock(CoordinateInBlocks(paintCord.X, paintCord.Y, paintCord.Z + 1));
+	}
+}
+
+
+// Undo Methods
+//********************************
 void UndoLastOperation() {
 	for (HistoryBlock hb : lastPaintOperation) {
 		SetBlock(hb.location, hb.blockInfo);
 	}
 	lastPaintOperation.clear();
 }
+
 /************************************************************* 
-//	Functions (Run automatically by the game, you can put any code you want into them)
+//	Event Functions
 *************************************************************/
 
-// Run every time a block is placed
 void Event_BlockPlaced(CoordinateInBlocks At, UniqueID CustomBlockID, bool Moved)
 {
 	if (CustomBlockID == Marker1Block) {
@@ -172,7 +196,6 @@ void Event_BlockPlaced(CoordinateInBlocks At, UniqueID CustomBlockID, bool Moved
 	}
 }
 
-// Run every time a block is destroyed
 void Event_BlockDestroyed(CoordinateInBlocks At, UniqueID CustomBlockID, bool Moved)
 {
 	if (CustomBlockID == MaskBlock) {
@@ -181,8 +204,6 @@ void Event_BlockDestroyed(CoordinateInBlocks At, UniqueID CustomBlockID, bool Mo
 	}
 }
 
-
-// Run every time a block is hit by a tool
 void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::wstring ToolName)
 {
 	if (ToolName == L"T_Stick") {
@@ -195,52 +216,37 @@ void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::ws
 	}
 }
 
-// Run X times per second, as specified in the TickRate variable at the top
 void Event_Tick()
 {
 
 }
 
-
-
-// Run once when the world is loaded
 void Event_OnLoad()
 {
 
 }
 
-// Run once when the world is exited
 void Event_OnExit()
 {
 	
 }
 
-/*******************************************************
+/*************************************************************
+//	Advanced Event Functions
+*************************************************************/
 
-	Advanced functions
-
-*******************************************************/
-
-// Run every time any block (not part of the ThisModUniqueIDs) is placed by the player
 void Event_AnyBlockPlaced(CoordinateInBlocks At, BlockInfo Type, bool Moved)
 {
 
 }
 
-// Run every time any block (not part of the ThisModUniqueIDs) is destroyed by the player
 void Event_AnyBlockDestroyed(CoordinateInBlocks At, BlockInfo Type, bool Moved)
 {
 
 }
 
-// Run every time any block (not part of the ThisModUniqueIDs) is hit by a tool
 void Event_AnyBlockHitByTool(CoordinateInBlocks At, BlockInfo Type, std::wstring ToolName)
 {
+
 }
-
-/*******************************************************
-
-	For all the available game functions you can call, look at the GameAPI.h file
-
-*******************************************************/
 
