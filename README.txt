@@ -24,6 +24,15 @@ with a stick once more. You do not need to make a new selection.
 If you need to edit your selection feel free to drag around the marker blocks into new locations.
 You can also pick up one or both markers and move them to new locations.
 
+You can undo your last operation by placing an undo block. Simply tap the block with a stick and
+the results of the last paint operation will be undone. You cannot undo an undo. You can only
+undo your last paint operation, no further history is saved.
+
+You mask your paint operation using the mask block. Place your mask block into the world and any
+blocks placed above it will be used to mask your operation. Only blocks that appear in the mask
+you set will be affected by your paint operation. If you need to include air in your mask, use
+the air filter block.
+
 Uninstallation Instructions
 ================================
 To uninstall the mod, remove the "cyubePainter" folder from your APIMods folder in the your 
