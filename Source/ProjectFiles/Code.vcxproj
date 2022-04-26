@@ -23,7 +23,6 @@
     <ClCompile Include="Source\GameFunctions.cpp" />
     <ClInclude Include="Source\Mod.cpp" />
     <ClCompile Include="Source\Internals.cpp" />
-    <ClInclude Include="Source\Mod.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\GameAPI.h" />

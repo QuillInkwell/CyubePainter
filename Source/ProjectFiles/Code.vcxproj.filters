@@ -41,8 +41,5 @@
     <ClInclude Include="Source\GameAPI.cpp">
       <Filter>Source Files\InternalFiles</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Mod.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>
