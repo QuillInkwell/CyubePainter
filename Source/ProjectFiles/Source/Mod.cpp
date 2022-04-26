@@ -12,13 +12,14 @@ const int UndoBlock = 3023;
 const int Marker1Block = 3024;
 const int Marker2Block = 3025;
 const int MaskBlock = 3026;
+const int AirFilter = 3027;
 
 CoordinateInBlocks marker1Cord;
 CoordinateInBlocks marker2Cord;
 CoordinateInBlocks maskCord;
 CoordinateInBlocks paintCord;
 
-
+bool maskBlockPlaced = false;
 
 UniqueID ThisModUniqueIDs[] = { PaintBlock, UndoBlock, Marker1Block, Marker2Block, MaskBlock };
 
@@ -51,15 +52,24 @@ CoordinateInBlocks GetLargeVector(CoordinateInBlocks cord1, CoordinateInBlocks c
 
 std::list<BlockInfo> GetMaskBlocks()
 {
-	int i = 1;
 	std::list<BlockInfo> maskBlocks;
-	BlockInfo maskBlock = GetBlock(CoordinateInBlocks(maskCord.X, maskCord.Y, maskCord.Z + i));
-	while (maskBlock.Type != EBlockType::Air) {
-		maskBlocks.push_front(maskBlock);
+	BlockInfo block = GetBlock(maskCord + CoordinateInBlocks(0, 0, 1));
+	int i = 1;
+	while (block.Type != EBlockType::Air) {
+		maskBlocks.push_front(block);
 		i++;
-		maskBlock = GetBlock(CoordinateInBlocks(maskCord.X, maskCord.Y, maskCord.Z + 1));
+		block = GetBlock(maskCord + CoordinateInBlocks(0, 0, i));
 	}
 	return maskBlocks;
+}
+bool BlockIsMaskTarget(BlockInfo info, std::list<BlockInfo> mask) {
+	for (BlockInfo maskInfo : mask) {
+		if (maskInfo.CustomBlockID == AirFilter && info.Type == EBlockType::Air)
+			return true;
+		if (info.Type == maskInfo.Type && info.CustomBlockID == maskInfo.CustomBlockID)
+			return true;
+	}
+	return false;
 }
 
 void PaintArea() {
@@ -103,22 +113,31 @@ void PaintArea() {
 		targetBlock = GetBlock(CoordinateInBlocks(paintCord.X, paintCord.Y, paintCord.Z + 1));
 	}
 	// Set the block mask if one exists
-	if (!(GetBlock(maskCord).Type == EBlockType::Invalid)) {
-		useMask = true;
+	if (maskBlockPlaced && !(GetBlock(maskCord).Type == EBlockType::Invalid)) {
 		maskBlocks = GetMaskBlocks();
+		if (!(maskBlocks.empty())) {
+			useMask = true;
+		}
 	}
 
 	CoordinateInBlocks startCorner = GetSmallVector(marker1Cord, marker2Cord);
 	CoordinateInBlocks endCorner = GetLargeVector(marker1Cord, marker2Cord);
-
+	lastPaintOperation.clear();
 
 	for (int16_t z = startCorner.Z; z <= endCorner.Z; z++) {
+
 		for (int64_t y = startCorner.Y; y <= endCorner.Y; y++) {
+
 			for (int64_t x = startCorner.X; x <= endCorner.X; x++) {
-//				lastPaintOperation.push_front(HistoryBlock(
-//					GetBlock(CoordinateInBlocks(x, y, z)),
-//					CoordinateInBlocks(x, y, z)
-//				));
+				
+				BlockInfo currentBlock = GetBlock(CoordinateInBlocks(x, y, z));
+				if (useMask && !(BlockIsMaskTarget(currentBlock, maskBlocks)) ) {
+					continue;
+				}
+				lastPaintOperation.push_front(HistoryBlock(
+					GetBlock(CoordinateInBlocks(x, y, z)),
+					CoordinateInBlocks(x, y, z)
+				));
 				SetBlock(CoordinateInBlocks(x, y, z), targetBlock);
 			}
 		}
@@ -146,6 +165,7 @@ void Event_BlockPlaced(CoordinateInBlocks At, UniqueID CustomBlockID, bool Moved
 	}
 	else if (CustomBlockID == MaskBlock) {
 		maskCord = At;
+		maskBlockPlaced = true;
 	}
 	else if (CustomBlockID == PaintBlock) {
 		paintCord = At;
@@ -155,7 +175,10 @@ void Event_BlockPlaced(CoordinateInBlocks At, UniqueID CustomBlockID, bool Moved
 // Run every time a block is destroyed
 void Event_BlockDestroyed(CoordinateInBlocks At, UniqueID CustomBlockID, bool Moved)
 {
-
+	if (CustomBlockID == MaskBlock) {
+		maskBlockPlaced = false;
+		maskCord = CoordinateInBlocks(0, 0, 0);
+	}
 }
 
 
@@ -167,11 +190,10 @@ void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::ws
 			PaintArea();
 		}
 		if (CustomBlockID == UndoBlock) {
-//			UndoLastOperation();
+			UndoLastOperation();
 		}
 	}
 }
-
 
 // Run X times per second, as specified in the TickRate variable at the top
 void Event_Tick()
@@ -192,7 +214,6 @@ void Event_OnExit()
 {
 	
 }
-
 /*******************************************************
 
 	For all the available game functions you can call, look at the GameAPI.h file
