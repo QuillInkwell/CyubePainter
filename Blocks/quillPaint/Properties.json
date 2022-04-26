@@ -1,0 +1,18 @@
+{
+    "Name": "Paint",
+    "CreatorName": "Quill Inkwell",
+    "CategoryName": "cyubePainter",
+    "UniqueID": 3022,
+    "Recipe": {
+    		"Array" : [64,34,34],
+    		"SizeX": 1,
+    		"SizeY": 1,
+    		"SizeZ": 3
+    },
+    "Yield": 1,
+    "SimilarTo": 1,
+    "Textures": {
+        "Mode": 1,
+        "WithNormals" : false
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "Name": "Undo",
+    "CreatorName": "Quill Inkwell",
+    "CategoryName": "cyubePainter",
+    "UniqueID": 3023,
+    "Recipe": {
+    		"Array" : [11,11,34,11,34,34,34,34,11,11,34,11],
+    		"SizeX": 1,
+    		"SizeY": 4,
+    		"SizeZ": 3
+    },
+    "Yield": 1,
+    "SimilarTo": 1,
+    "Textures": {
+        "Mode": 1,
+        "WithNormals" : false
+    }
+}

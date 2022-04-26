@@ -1,0 +1,18 @@
+{
+    "Name": "Marker 2",
+    "CreatorName": "Quill Inkwell",
+    "CategoryName": "cyubePainter",
+    "UniqueID": 3025,
+    "Recipe": {
+    		"Array" : [34,34,34,48],
+    		"SizeX": 1,
+    		"SizeY": 2,
+    		"SizeZ": 2
+    },
+    "Yield": 1,
+    "SimilarTo": 1,
+    "Textures": {
+        "Mode": 1,
+        "WithNormals" : false
+    }
+}
