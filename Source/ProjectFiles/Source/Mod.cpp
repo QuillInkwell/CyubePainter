@@ -22,9 +22,10 @@ const int PasteBlock = 3031;
 const int Rotate90CWBlock = 3032;
 const int RedoBlock = 3033;
 const int Rotate90CCWBlock = 3034;
+const int PaletteBlock = 3035;
 
 UniqueID ThisModUniqueIDs[] = { 
-	PaintBlock, UndoBlock, Marker1Block, Marker2Block, MaskBlock, ToggleWandBlock, CopyBlock, CutBlock, PasteBlock, Rotate90CWBlock, RedoBlock, Rotate90CCWBlock };
+	PaintBlock, UndoBlock, Marker1Block, Marker2Block, MaskBlock, ToggleWandBlock, CopyBlock, CutBlock, PasteBlock, Rotate90CWBlock, RedoBlock, Rotate90CCWBlock, PaletteBlock };
 
 // Data Structs
 //********************************
@@ -37,6 +38,7 @@ struct Block {
 		location = cords;
 	}
 };
+
 
 // State Variables
 //********************************
@@ -67,6 +69,43 @@ CoordinateInBlocks GetLargeVector(CoordinateInBlocks cord1, CoordinateInBlocks c
 	int16_t z = (cord1.Z > cord2.Z) ? cord1.Z : cord2.Z;
 
 	return CoordinateInBlocks(x, y, z);
+}
+
+// Palette Methods
+//********************************
+bool TryGeneratePalette(CoordinateInBlocks At) {
+	for (int z = 0; z <= 1; z++) {
+		for (int x = 0; x <= 7; x++) {
+			BlockInfo currentBlock = GetBlock(At + CoordinateInBlocks(x, 0, z));
+			if (currentBlock.Type != EBlockType::Air) {
+				SpawnHintText( GetPlayerLocation(), L"No space for palette here!", 1, 1);
+				return false;
+			}
+		}
+	}
+	
+	SetBlock(At + CoordinateInBlocks(1, 0, 0), BlockInfo(PaintBlock));
+	SetBlock(At + CoordinateInBlocks(2, 0, 0), BlockInfo(MaskBlock));
+	SetBlock(At + CoordinateInBlocks(3, 0, 0), BlockInfo(UndoBlock));
+	SetBlock(At + CoordinateInBlocks(3, 0, 1), BlockInfo(RedoBlock));
+	SetBlock(At + CoordinateInBlocks(4, 0, 0), BlockInfo(CopyBlock));
+	SetBlock(At + CoordinateInBlocks(4, 0, 1), BlockInfo(CutBlock));
+	SetBlock(At + CoordinateInBlocks(5, 0, 0), BlockInfo(Rotate90CWBlock));
+	SetBlock(At + CoordinateInBlocks(5, 0, 1), BlockInfo(Rotate90CCWBlock));
+	SetBlock(At + CoordinateInBlocks(6, 0, 0), BlockInfo(ToggleWandBlock));
+	return true;
+}
+
+void RemovePalette(CoordinateInBlocks At) {
+	SetBlock(At + CoordinateInBlocks(1, 0, 0), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(2, 0, 0), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(3, 0, 0), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(3, 0, 1), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(4, 0, 0), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(4, 0, 1), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(5, 0, 0), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(5, 0, 1), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(6, 0, 0), EBlockType::Air);
 }
 
 // Masking Methods
@@ -340,6 +379,15 @@ void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::ws
 		}
 		else if (CustomBlockID == Rotate90CCWBlock) {
 			RotateClipboard90DegreesCounterClockwise();
+		}
+		else if (CustomBlockID == PaletteBlock) {
+			BlockInfo painterBlock = GetBlock(At + CoordinateInBlocks(1, 0, 0));
+			if (painterBlock.CustomBlockID == PaintBlock) {
+				RemovePalette(At);
+			}
+			else {
+				TryGeneratePalette(At);
+			}
 		}
 	}
 }

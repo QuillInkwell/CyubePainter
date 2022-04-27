@@ -4,13 +4,13 @@
     "CategoryName": "cyubePainter",
     "UniqueID": 3031,
 //    "Recipe": {
-//    		"Array" : [11,11,34,11,34,34,34,34,11,11,34,11],
-//    		"SizeX": 1,
-//    		"SizeY": 4,
-//    		"SizeZ": 3
+//    		"Array" : [],
+//    		"SizeX": 0,
+//    		"SizeY": 0,
+//    		"SizeZ": 0
 //    },
     "Yield": 1,
-    "SimilarTo": 1,
+    "SimilarTo": 4,
     "Textures": {
         "Mode": 1,
         "WithNormals" : false
