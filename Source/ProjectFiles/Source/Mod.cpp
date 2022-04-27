@@ -47,7 +47,6 @@ CoordinateInBlocks marker2Cord;
 CoordinateInBlocks maskCord;
 CoordinateInBlocks paintCord;
 
-bool maskBlockPlaced = false;
 bool selectionWandEnabled = false;
 
 std::list<Block> lastPaintOperation;
@@ -74,7 +73,7 @@ CoordinateInBlocks GetLargeVector(CoordinateInBlocks cord1, CoordinateInBlocks c
 // Palette Methods
 //********************************
 bool TryGeneratePalette(CoordinateInBlocks At) {
-	for (int z = 0; z <= 1; z++) {
+	for (int z = 0; z <= 2; z++) {
 		for (int x = 0; x <= 7; x++) {
 			BlockInfo currentBlock = GetBlock(At + CoordinateInBlocks(x, 0, z));
 			if (currentBlock.Type != EBlockType::Air) {
@@ -87,12 +86,12 @@ bool TryGeneratePalette(CoordinateInBlocks At) {
 	SetBlock(At + CoordinateInBlocks(1, 0, 0), BlockInfo(PaintBlock));
 	SetBlock(At + CoordinateInBlocks(2, 0, 0), BlockInfo(MaskBlock));
 	SetBlock(At + CoordinateInBlocks(3, 0, 0), BlockInfo(UndoBlock));
-	SetBlock(At + CoordinateInBlocks(3, 0, 1), BlockInfo(RedoBlock));
+	SetBlock(At + CoordinateInBlocks(3, 0, 2), BlockInfo(RedoBlock));
 	SetBlock(At + CoordinateInBlocks(4, 0, 0), BlockInfo(CopyBlock));
-	SetBlock(At + CoordinateInBlocks(4, 0, 1), BlockInfo(CutBlock));
+	SetBlock(At + CoordinateInBlocks(4, 0, 2), BlockInfo(CutBlock));
 	SetBlock(At + CoordinateInBlocks(5, 0, 0), BlockInfo(Rotate90CWBlock));
-	SetBlock(At + CoordinateInBlocks(5, 0, 1), BlockInfo(Rotate90CCWBlock));
-	SetBlock(At + CoordinateInBlocks(6, 0, 0), BlockInfo(ToggleWandBlock));
+	SetBlock(At + CoordinateInBlocks(5, 0, 2), BlockInfo(Rotate90CCWBlock));
+//	SetBlock(At + CoordinateInBlocks(6, 0, 0), BlockInfo(ToggleWandBlock));
 	return true;
 }
 
@@ -100,12 +99,12 @@ void RemovePalette(CoordinateInBlocks At) {
 	SetBlock(At + CoordinateInBlocks(1, 0, 0), EBlockType::Air);
 	SetBlock(At + CoordinateInBlocks(2, 0, 0), EBlockType::Air);
 	SetBlock(At + CoordinateInBlocks(3, 0, 0), EBlockType::Air);
-	SetBlock(At + CoordinateInBlocks(3, 0, 1), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(3, 0, 2), EBlockType::Air);
 	SetBlock(At + CoordinateInBlocks(4, 0, 0), EBlockType::Air);
-	SetBlock(At + CoordinateInBlocks(4, 0, 1), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(4, 0, 2), EBlockType::Air);
 	SetBlock(At + CoordinateInBlocks(5, 0, 0), EBlockType::Air);
-	SetBlock(At + CoordinateInBlocks(5, 0, 1), EBlockType::Air);
-	SetBlock(At + CoordinateInBlocks(6, 0, 0), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(5, 0, 2), EBlockType::Air);
+//	SetBlock(At + CoordinateInBlocks(6, 0, 0), EBlockType::Air);
 }
 
 // Masking Methods
@@ -189,18 +188,10 @@ void PaintArea() {
 	if (targetBlock.Type == EBlockType::Invalid) return;
 
 	// Set the block mask if one exists
-	if (maskBlockPlaced && !(GetBlock(maskCord).Type == EBlockType::Invalid)) {
+	if (!(GetBlock(maskCord).Type == EBlockType::Invalid)) {
 		maskBlocks = GetMaskBlocks();
 		if (!(maskBlocks.empty())) {
 			useMask = true;
-		}
-		else {
-			SpawnHintText(
-				GetPlayerLocation(),
-				L"Masking block found but mask is empty! Please ensure your mask blocks are placed above the masking block. If you wish to mask for air use an Air Filter block.",
-				1,
-				1
-			);
 		}
 	}
 
@@ -230,10 +221,12 @@ void UndoLastOperation() {
 	if (lastPaintOperation.empty()) return;
 	
 	lastUndoOperation.clear();
-	for (const Block& hb : lastPaintOperation) {
-		BlockInfo currentBlock = GetBlock(hb.location);
-		lastUndoOperation.push_front(Block(currentBlock, hb.location));
-		SetBlock(hb.location, hb.blockInfo);
+
+	std::list<Block>::iterator it;
+	for (it = lastPaintOperation.begin(); it != lastPaintOperation.end(); it++) {
+		BlockInfo currentBlock = GetBlock(it->location);
+		lastUndoOperation.push_front(Block(currentBlock, it->location));
+		SetBlock(it->location, it->blockInfo);
 	}
 	lastPaintOperation.clear();
 }
@@ -241,9 +234,10 @@ void UndoLastOperation() {
 void RedoLastOperation() {
 	if (lastUndoOperation.empty()) return;
 
-	for (const Block& hb : lastUndoOperation) {
-		BlockInfo currentBlock = GetBlock(hb.location);
-		Paint(currentBlock, hb.blockInfo, hb.location);
+	std::list<Block>::iterator it;
+	for (it = lastUndoOperation.begin(); it != lastUndoOperation.end(); it++) {
+		BlockInfo currentBlock = GetBlock(it->location);
+		Paint(currentBlock, it->blockInfo, it->location);
 	}
 	lastUndoOperation.clear();
 }
@@ -260,9 +254,9 @@ void CopyRegion() {
 		for (int64_t y = startCorner.Y; y <= endCorner.Y; y++) {
 
 			for (int64_t x = startCorner.X; x <= endCorner.X; x++) {
-				int localX = x - startCorner.X;
-				int localY = y - startCorner.Y;
-				int localZ = z - startCorner.Z;
+				int64_t localX = x - startCorner.X;
+				int64_t localY = y - startCorner.Y;
+				int16_t localZ = z - startCorner.Z;
 				BlockInfo currentBlock = GetBlock(CoordinateInBlocks(x, y, z));
 
 				clipboard.push_front(Block(currentBlock, CoordinateInBlocks(localX, localY, localZ)));
@@ -283,9 +277,9 @@ void CutRegion() {
 		for (int64_t y = startCorner.Y; y <= endCorner.Y; y++) {
 
 			for (int64_t x = startCorner.X; x <= endCorner.X; x++) {
-				int localX = x - startCorner.X;
-				int localY = y - startCorner.Y;
-				int localZ = z - startCorner.Z;
+				int64_t localX = x - startCorner.X;
+				int64_t localY = y - startCorner.Y;
+				int16_t localZ = z - startCorner.Z;
 				BlockInfo currentBlock = GetBlock(CoordinateInBlocks(x, y, z));
 
 				clipboard.push_front(Block(currentBlock, CoordinateInBlocks(localX, localY, localZ)));
@@ -299,25 +293,28 @@ void PasteClipboard(CoordinateInBlocks At) {
 	if (clipboard.empty()) return;
 	lastPaintOperation.clear();
 
-	for (const Block& block : clipboard) {
-		BlockInfo currentBlock = GetBlock(At + block.location);
-		Paint(currentBlock, block.blockInfo, At + block.location);
+	std::list<Block>::iterator it;
+	for (it = clipboard.begin(); it != clipboard.end(); it++) {
+		BlockInfo currentBlock = GetBlock(At + it->location);
+		Paint(currentBlock, it->blockInfo, At + it->location);
 	}
 }
 
 void RotateClipboard90DegreesClockwise() {
-	for (Block block : clipboard) {
-		int x = block.location.Y;
-		int y = block.location.X * -1;
-		block.location = CoordinateInBlocks(x, y, block.location.Z);
+	std::list<Block>::iterator it;
+	for (it = clipboard.begin(); it != clipboard.end(); it++) {
+		int64_t x = it->location.Y;
+		int64_t y = it->location.X * -1;
+		it->location = CoordinateInBlocks(x, y, it->location.Z);
 	}
 }
 
 void RotateClipboard90DegreesCounterClockwise() {
-	for (Block block : clipboard) {
-		int x = block.location.Y * -1;
-		int y = block.location.X;
-		block.location = CoordinateInBlocks(x, y, block.location.Z);
+	std::list<Block>::iterator it;
+	for (it = clipboard.begin(); it != clipboard.end(); it++) {
+		int64_t x = it->location.Y * -1;
+		int64_t y = it->location.X;
+		it->location = CoordinateInBlocks(x, y, it->location.Z);
 	}
 }
 
@@ -335,7 +332,6 @@ void Event_BlockPlaced(CoordinateInBlocks At, UniqueID CustomBlockID, bool Moved
 	}
 	else if (CustomBlockID == MaskBlock) {
 		maskCord = At;
-		maskBlockPlaced = true;
 	}
 	else if (CustomBlockID == PaintBlock) {
 		paintCord = At;
@@ -345,8 +341,11 @@ void Event_BlockPlaced(CoordinateInBlocks At, UniqueID CustomBlockID, bool Moved
 void Event_BlockDestroyed(CoordinateInBlocks At, UniqueID CustomBlockID, bool Moved)
 {
 	if (CustomBlockID == MaskBlock) {
-		maskBlockPlaced = false;
+		// May cause issues in edge case if painting after placing multiple palettes
 		maskCord = CoordinateInBlocks(0, 0, 0);
+	}
+	if (CustomBlockID == PaletteBlock) {
+		RemovePalette(At);
 	}
 }
 
@@ -361,6 +360,7 @@ void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::ws
 		}
 		else if (CustomBlockID == ToggleWandBlock) {
 			selectionWandEnabled = !selectionWandEnabled;
+			SpawnHintText(At + CoordinateInBlocks(0, 0, 1), L"Selection Wand Enabled: " + selectionWandEnabled, 1, 1);
 		}
 		else if (CustomBlockID == RedoBlock) {
 			RedoLastOperation();
@@ -423,13 +423,15 @@ void Event_AnyBlockDestroyed(CoordinateInBlocks At, BlockInfo Type, bool Moved)
 
 void Event_AnyBlockHitByTool(CoordinateInBlocks At, BlockInfo Type, std::wstring ToolName)
 {
+	Log(L"A blocks was hit by the tool " + ToolName);
 	if (selectionWandEnabled) {
+		Log(L"The selection wand was enabled when the block was hit!");
 		if (ToolName == L"T_Pickaxe_Stone") {
-			SpawnHintText(At, L"Marker 1 set!", 1, 1);
+			SpawnHintText(At + CoordinateInBlocks(0,0,1), L"Marker 1 set!", 1, 1);
 			marker1Cord = At;
 		}
 		if (ToolName == L"T_Axe_Stone") {
-			SpawnHintText(At, L"Marker 2 set!", 1, 1);
+			SpawnHintText(At + CoordinateInBlocks(0, 0, 1), L"Marker 2 set!", 1, 1);
 			marker2Cord = At;
 		}
 	}
