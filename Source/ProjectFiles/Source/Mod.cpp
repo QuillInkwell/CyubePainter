@@ -1,6 +1,5 @@
 #include "GameAPI.h"
 #include <list>
-#include "Mod.h"
 
 /************************************************************
 	Config Variables (Set these to whatever you need. They are automatically read by the game.)
@@ -53,6 +52,9 @@ std::list<Block> lastPaintOperation;
 std::list<Block> lastUndoOperation;
 std::list<Block> clipboard;
 
+int64_t clipboardWidth;
+int64_t clipboardLength;
+
 // Utility Methods
 //********************************
 CoordinateInBlocks GetSmallVector(CoordinateInBlocks cord1, CoordinateInBlocks cord2) {
@@ -91,7 +93,7 @@ bool TryGeneratePalette(CoordinateInBlocks At) {
 	SetBlock(At + CoordinateInBlocks(4, 0, 2), BlockInfo(CutBlock));
 	SetBlock(At + CoordinateInBlocks(5, 0, 0), BlockInfo(Rotate90CWBlock));
 	SetBlock(At + CoordinateInBlocks(5, 0, 2), BlockInfo(Rotate90CCWBlock));
-//	SetBlock(At + CoordinateInBlocks(6, 0, 0), BlockInfo(ToggleWandBlock));
+	SetBlock(At + CoordinateInBlocks(6, 0, 0), BlockInfo(ToggleWandBlock));
 	return true;
 }
 
@@ -104,7 +106,7 @@ void RemovePalette(CoordinateInBlocks At) {
 	SetBlock(At + CoordinateInBlocks(4, 0, 2), EBlockType::Air);
 	SetBlock(At + CoordinateInBlocks(5, 0, 0), EBlockType::Air);
 	SetBlock(At + CoordinateInBlocks(5, 0, 2), EBlockType::Air);
-//	SetBlock(At + CoordinateInBlocks(6, 0, 0), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(6, 0, 0), EBlockType::Air);
 }
 
 // Masking Methods
@@ -249,6 +251,9 @@ void CopyRegion() {
 	CoordinateInBlocks endCorner = GetLargeVector(marker1Cord, marker2Cord);
 	clipboard.clear();
 
+	clipboardWidth = endCorner.X - startCorner.X;
+	clipboardLength = endCorner.Y - startCorner.Y;
+
 	for (int16_t z = startCorner.Z; z <= endCorner.Z; z++) {
 
 		for (int64_t y = startCorner.Y; y <= endCorner.Y; y++) {
@@ -272,6 +277,9 @@ void CutRegion() {
 	clipboard.clear();
 	lastPaintOperation.clear();
 
+	clipboardWidth = endCorner.X - startCorner.X;
+	clipboardLength = endCorner.Y - startCorner.Y;
+
 	for (int16_t z = startCorner.Z; z <= endCorner.Z; z++) {
 
 		for (int64_t y = startCorner.Y; y <= endCorner.Y; y++) {
@@ -293,8 +301,18 @@ void PasteClipboard(CoordinateInBlocks At) {
 	if (clipboard.empty()) return;
 	lastPaintOperation.clear();
 
+	bool ignoreAirBlocks = false;
+	BlockInfo blockAbove = GetBlock(At + CoordinateInBlocks(0, 0, 1));
+	if (blockAbove.CustomBlockID == AirFilter) {
+		ignoreAirBlocks = true;
+		Paint(BlockInfo(PasteBlock), EBlockType::Air, At);
+		Paint(blockAbove, EBlockType::Air, At + CoordinateInBlocks(0, 0, 1));
+	}
+
 	std::list<Block>::iterator it;
 	for (it = clipboard.begin(); it != clipboard.end(); it++) {
+		if (ignoreAirBlocks && it->blockInfo.Type == EBlockType::Air) continue;
+
 		BlockInfo currentBlock = GetBlock(At + it->location);
 		Paint(currentBlock, it->blockInfo, At + it->location);
 	}
@@ -305,8 +323,11 @@ void RotateClipboard90DegreesClockwise() {
 	for (it = clipboard.begin(); it != clipboard.end(); it++) {
 		int64_t x = it->location.Y;
 		int64_t y = it->location.X * -1;
-		it->location = CoordinateInBlocks(x, y, it->location.Z);
+		it->location = CoordinateInBlocks(x, y+clipboardWidth, it->location.Z);
 	}
+	int64_t width = clipboardWidth;
+	clipboardWidth = clipboardLength;
+	clipboardLength = width;
 }
 
 void RotateClipboard90DegreesCounterClockwise() {
@@ -314,8 +335,11 @@ void RotateClipboard90DegreesCounterClockwise() {
 	for (it = clipboard.begin(); it != clipboard.end(); it++) {
 		int64_t x = it->location.Y * -1;
 		int64_t y = it->location.X;
-		it->location = CoordinateInBlocks(x, y, it->location.Z);
+		it->location = CoordinateInBlocks(x+clipboardLength, y, it->location.Z);
 	}
+	int64_t width = clipboardWidth;
+	clipboardWidth = clipboardLength;
+	clipboardLength = width;
 }
 
 /************************************************************* 
@@ -360,7 +384,8 @@ void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::ws
 		}
 		else if (CustomBlockID == ToggleWandBlock) {
 			selectionWandEnabled = !selectionWandEnabled;
-			SpawnHintText(At + CoordinateInBlocks(0, 0, 1), L"Selection Wand Enabled: " + selectionWandEnabled, 1, 1);
+			wString messageText = (selectionWandEnabled) ? L"Selection Wand Enabled" : L"Selection Wand Disabled";
+			SpawnHintText(At + CoordinateInBlocks(0, 0, 1), messageText, 1, 1);
 		}
 		else if (CustomBlockID == RedoBlock) {
 			RedoLastOperation();
@@ -421,13 +446,11 @@ void Event_AnyBlockDestroyed(CoordinateInBlocks At, BlockInfo Type, bool Moved)
 
 }
 
-void Event_AnyBlockHitByTool(CoordinateInBlocks At, BlockInfo Type, std::wstring ToolName)
+void Event_AnyBlockHitByTool(CoordinateInBlocks At, BlockInfo Type, wString ToolName)
 {
-	Log(L"A blocks was hit by the tool " + ToolName);
 	if (selectionWandEnabled) {
-		Log(L"The selection wand was enabled when the block was hit!");
 		if (ToolName == L"T_Pickaxe_Stone") {
-			SpawnHintText(At + CoordinateInBlocks(0,0,1), L"Marker 1 set!", 1, 1);
+			SpawnHintText(At + CoordinateInBlocks(0, 0, 1), L"Marker 1 set!", 1, 1);
 			marker1Cord = At;
 		}
 		if (ToolName == L"T_Axe_Stone") {
