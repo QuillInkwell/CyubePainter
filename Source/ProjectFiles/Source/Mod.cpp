@@ -71,6 +71,10 @@ CoordinateInBlocks GetLargeVector(CoordinateInBlocks cord1, CoordinateInBlocks c
 
 	return CoordinateInBlocks(x, y, z);
 }
+CoordinateInBlocks GetBlockAbove(CoordinateInBlocks At) {
+	return At + CoordinateInBlocks(0, 0, 1);
+}
+
 
 // Palette Methods
 //********************************
@@ -375,35 +379,48 @@ void Event_BlockDestroyed(CoordinateInBlocks At, UniqueID CustomBlockID, bool Mo
 
 void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::wstring ToolName)
 {
+	if (ToolName == L"T_Arrow") {
+		if (CustomBlockID == PasteBlock) {
+			PasteClipboard(At);
+		}
+	}
+
 	if (ToolName == L"T_Stick") {
 		if (CustomBlockID == PaintBlock) {
 			PaintArea();
+			SpawnHintText(GetBlockAbove(At), L"Painting Area.", 1, 1);
 		}
 		else if (CustomBlockID == UndoBlock) {
 			UndoLastOperation();
+			SpawnHintText(GetBlockAbove(At), L"Undoing Last Operation", 1, 1);
 		}
 		else if (CustomBlockID == ToggleWandBlock) {
 			selectionWandEnabled = !selectionWandEnabled;
 			wString messageText = (selectionWandEnabled) ? L"Selection Wand Enabled" : L"Selection Wand Disabled";
-			SpawnHintText(At + CoordinateInBlocks(0, 0, 1), messageText, 1, 1);
+			SpawnHintText(GetBlockAbove(At), messageText, 1, 1);
 		}
 		else if (CustomBlockID == RedoBlock) {
 			RedoLastOperation();
+			SpawnHintText(GetBlockAbove(At), L"Redoing Last Operation.", 1, 1);
 		}
 		else if (CustomBlockID == CopyBlock) {
 			CopyRegion();
+			SpawnHintText(GetBlockAbove(At), L"Copying Selected Region.", 1, 1);
 		}
 		else if (CustomBlockID == CutBlock) {
 			CutRegion();
+			SpawnHintText(GetBlockAbove(At), L"Cutting Selected Region.", 1, 1);
 		}
 		else if (CustomBlockID == PasteBlock) {
 			PasteClipboard(At);
 		}
 		else if (CustomBlockID == Rotate90CWBlock) {
 			RotateClipboard90DegreesClockwise();
+			SpawnHintText(GetBlockAbove(At), L"Rotating Clipboard 90 degrees clockwise.", 1, 1);
 		}
 		else if (CustomBlockID == Rotate90CCWBlock) {
 			RotateClipboard90DegreesCounterClockwise();
+			SpawnHintText(GetBlockAbove(At), L"Rotating Clipboard 90 degrees counterclockwise", 1, 1);
 		}
 		else if (CustomBlockID == PaletteBlock) {
 			BlockInfo painterBlock = GetBlock(At + CoordinateInBlocks(1, 0, 0));
