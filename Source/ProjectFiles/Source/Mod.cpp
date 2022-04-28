@@ -5,6 +5,7 @@
 	Config Variables (Set these to whatever you need. They are automatically read by the game.)
 *************************************************************/
 float TickRate = 1;
+const int UndoHistoryLength = 5;
 
 // Unique Mod IDS
 //********************************
@@ -37,7 +38,21 @@ struct Block {
 		location = cords;
 	}
 };
+struct PaintOperation {
+	std::list<Block> paintedBlocks;
 
+	PaintOperation ExecutePaint() {
+		std::list<Block> reverseOperation;
+
+		std::list<Block>::iterator it;
+		for (it = paintedBlocks.begin(); it != paintedBlocks.end(); it++) {
+			BlockInfo currentBlock = GetBlock(it->location);
+			reverseOperation.push_front(Block(currentBlock, it->location));
+			SetBlock(it->location, it->blockInfo);
+		}
+		return PaintOperation(reverseOperation);
+	}
+};
 
 // State Variables
 //********************************
@@ -48,8 +63,8 @@ CoordinateInBlocks paintCord;
 
 bool selectionWandEnabled = false;
 
-std::list<Block> lastPaintOperation;
-std::list<Block> lastUndoOperation;
+std::list<PaintOperation> undoHistory;
+std::list<PaintOperation> redoHistory;
 std::list<Block> clipboard;
 
 int64_t clipboardWidth;
@@ -139,8 +154,8 @@ bool BlockIsMaskTarget(BlockInfo info, std::list<BlockInfo> mask) {
 
 // Paint Methods
 //********************************
-bool Paint(BlockInfo originalBlock, BlockInfo newBlock, CoordinateInBlocks At) {
-	lastPaintOperation.push_front(Block(originalBlock, At));
+bool Paint(PaintOperation paintOp, BlockInfo originalBlock, BlockInfo newBlock, CoordinateInBlocks At) {
+	paintOp.paintedBlocks.push_front(Block(originalBlock, At));
 	return SetBlock(At, newBlock);
 }
 
@@ -187,6 +202,7 @@ BlockInfo SetPaintTarget() {
 void PaintArea() {
 	bool useMask = false;
 	std::list<BlockInfo> maskBlocks;
+	PaintOperation paintOp;
 
 	if (!MarkersInLoadedChunks()) return;
 
@@ -203,7 +219,6 @@ void PaintArea() {
 
 	CoordinateInBlocks startCorner = GetSmallVector(marker1Cord, marker2Cord);
 	CoordinateInBlocks endCorner = GetLargeVector(marker1Cord, marker2Cord);
-	lastPaintOperation.clear();
 
 	for (int16_t z = startCorner.Z; z <= endCorner.Z; z++) {
 
@@ -215,7 +230,7 @@ void PaintArea() {
 				if (useMask && !(BlockIsMaskTarget(currentBlock, maskBlocks)) ) {
 					continue;
 				}
-				Paint(currentBlock, targetBlock, CoordinateInBlocks(x, y, z));
+				Paint(paintOp, currentBlock, targetBlock, CoordinateInBlocks(x, y, z));
 			}
 		}
 	}
@@ -223,29 +238,35 @@ void PaintArea() {
 
 // Undo Methods
 //********************************
-void UndoLastOperation() {
-	if (lastPaintOperation.empty()) return;
-	
-	lastUndoOperation.clear();
-
-	std::list<Block>::iterator it;
-	for (it = lastPaintOperation.begin(); it != lastPaintOperation.end(); it++) {
-		BlockInfo currentBlock = GetBlock(it->location);
-		lastUndoOperation.push_front(Block(currentBlock, it->location));
-		SetBlock(it->location, it->blockInfo);
+void AddRedoOperation(PaintOperation paintOp) {
+	if (redoHistory.size() > UndoHistoryLength) {
+		redoHistory.pop_back();
 	}
-	lastPaintOperation.clear();
+	redoHistory.push_front(paintOp);
+}
+void AddUndoOperation(PaintOperation paintOp) {
+	if (undoHistory.size() > UndoHistoryLength) {
+		undoHistory.pop_back();
+	}
+	undoHistory.push_front(paintOp);
+}
+
+void UndoLastOperation() {
+	if (undoHistory.empty()) return;
+	
+	PaintOperation paintOp = undoHistory.front();
+	undoHistory.pop_front();
+
+	AddRedoOperation(paintOp.ExecutePaint());
 }
 
 void RedoLastOperation() {
-	if (lastUndoOperation.empty()) return;
+	if (redoHistory.empty()) return;
 
-	std::list<Block>::iterator it;
-	for (it = lastUndoOperation.begin(); it != lastUndoOperation.end(); it++) {
-		BlockInfo currentBlock = GetBlock(it->location);
-		Paint(currentBlock, it->blockInfo, it->location);
-	}
-	lastUndoOperation.clear();
+	PaintOperation paintOp = redoHistory.front();
+	redoHistory.pop_front();
+
+	AddUndoOperation(paintOp.ExecutePaint());
 }
 
 // Clipboard Method
@@ -275,11 +296,12 @@ void CopyRegion() {
 }
 
 void CutRegion() {
+	PaintOperation paintOp;
+
 	CoordinateInBlocks startCorner = GetSmallVector(marker1Cord, marker2Cord);
 	CoordinateInBlocks endCorner = GetLargeVector(marker1Cord, marker2Cord);
 	
 	clipboard.clear();
-	lastPaintOperation.clear();
 
 	clipboardWidth = endCorner.X - startCorner.X;
 	clipboardLength = endCorner.Y - startCorner.Y;
@@ -295,7 +317,7 @@ void CutRegion() {
 				BlockInfo currentBlock = GetBlock(CoordinateInBlocks(x, y, z));
 
 				clipboard.push_front(Block(currentBlock, CoordinateInBlocks(localX, localY, localZ)));
-				Paint(currentBlock, EBlockType::Air, CoordinateInBlocks(x, y, z));
+				Paint(paintOp,currentBlock, EBlockType::Air, CoordinateInBlocks(x, y, z));
 			}
 		}
 	}
@@ -303,14 +325,14 @@ void CutRegion() {
 
 void PasteClipboard(CoordinateInBlocks At) {
 	if (clipboard.empty()) return;
-	lastPaintOperation.clear();
+	PaintOperation paintOp;
 
 	bool ignoreAirBlocks = false;
-	BlockInfo blockAbove = GetBlock(At + CoordinateInBlocks(0, 0, 1));
+	BlockInfo blockAbove = GetBlock(GetBlockAbove(At));
 	if (blockAbove.CustomBlockID == AirFilter) {
 		ignoreAirBlocks = true;
-		Paint(BlockInfo(PasteBlock), EBlockType::Air, At);
-		Paint(blockAbove, EBlockType::Air, At + CoordinateInBlocks(0, 0, 1));
+		Paint(paintOp, BlockInfo(PasteBlock), EBlockType::Air, At);
+		Paint(paintOp, blockAbove, EBlockType::Air, At + CoordinateInBlocks(0, 0, 1));
 	}
 
 	std::list<Block>::iterator it;
@@ -318,7 +340,7 @@ void PasteClipboard(CoordinateInBlocks At) {
 		if (ignoreAirBlocks && it->blockInfo.Type == EBlockType::Air) continue;
 
 		BlockInfo currentBlock = GetBlock(At + it->location);
-		Paint(currentBlock, it->blockInfo, At + it->location);
+		Paint(paintOp, currentBlock, it->blockInfo, At + it->location);
 	}
 }
 
