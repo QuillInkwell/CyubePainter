@@ -2,3 +2,4 @@ Version 0.1.2 Change Log
 - Most Command blocks now provide hint text feedback when triggering them.
 - You can now trigger the Paste block by shooting it with your bow.
 - You can now undo and redo up to 5 paint operations
+- Updated to the latest cyubeVR Beta
