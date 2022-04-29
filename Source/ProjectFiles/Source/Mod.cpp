@@ -23,9 +23,11 @@ const int Rotate90CWBlock = 3032;
 const int RedoBlock = 3033;
 const int Rotate90CCWBlock = 3034;
 const int PaletteBlock = 3035;
+const int ToggleExchangeBlock = 3036;
 
 UniqueID ThisModUniqueIDs[] = { 
-	PaintBlock, UndoBlock, Marker1Block, Marker2Block, MaskBlock, ToggleWandBlock, CopyBlock, CutBlock, PasteBlock, Rotate90CWBlock, RedoBlock, Rotate90CCWBlock, PaletteBlock };
+	PaintBlock, UndoBlock, Marker1Block, Marker2Block, MaskBlock, ToggleWandBlock, CopyBlock, CutBlock, 
+	PasteBlock, Rotate90CWBlock, RedoBlock, Rotate90CCWBlock, PaletteBlock, ToggleExchangeBlock };
 
 // Data Structs
 //********************************
@@ -62,6 +64,7 @@ CoordinateInBlocks maskCord;
 CoordinateInBlocks paintCord;
 
 bool selectionWandEnabled = false;
+bool exchangingWandEnabled = false;
 
 std::list<PaintOperation> undoHistory;
 std::list<PaintOperation> redoHistory;
@@ -69,6 +72,8 @@ std::list<Block> clipboard;
 
 int64_t clipboardWidth;
 int64_t clipboardLength;
+
+BlockInfo exchangeTarget(EBlockType::Air);
 
 // Utility Methods
 //********************************
@@ -113,6 +118,7 @@ bool TryGeneratePalette(CoordinateInBlocks At) {
 	SetBlock(At + CoordinateInBlocks(5, 0, 0), BlockInfo(Rotate90CWBlock));
 	SetBlock(At + CoordinateInBlocks(5, 0, 2), BlockInfo(Rotate90CCWBlock));
 	SetBlock(At + CoordinateInBlocks(6, 0, 0), BlockInfo(ToggleWandBlock));
+	SetBlock(At + CoordinateInBlocks(6, 0, 2), BlockInfo(ToggleExchangeBlock));
 	return true;
 }
 
@@ -126,6 +132,7 @@ void RemovePalette(CoordinateInBlocks At) {
 	SetBlock(At + CoordinateInBlocks(5, 0, 0), EBlockType::Air);
 	SetBlock(At + CoordinateInBlocks(5, 0, 2), EBlockType::Air);
 	SetBlock(At + CoordinateInBlocks(6, 0, 0), EBlockType::Air);
+	SetBlock(At + CoordinateInBlocks(6, 0, 2), EBlockType::Air);
 }
 
 // Masking Methods
@@ -409,18 +416,22 @@ void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::ws
 	}
 
 	if (ToolName == L"T_Stick") {
-		if (CustomBlockID == PaintBlock) {
+		if (CustomBlockID == PaletteBlock) {
+			BlockInfo painterBlock = GetBlock(At + CoordinateInBlocks(1, 0, 0));
+			if (painterBlock.CustomBlockID == PaintBlock) {
+				RemovePalette(At);
+			}
+			else {
+				TryGeneratePalette(At);
+			}
+		}
+		else if (CustomBlockID == PaintBlock) {
 			PaintArea();
 			SpawnHintText(GetBlockAbove(At), L"Painting Area.", 1, 1);
 		}
 		else if (CustomBlockID == UndoBlock) {
 			UndoLastOperation();
 			SpawnHintText(GetBlockAbove(At), L"Undoing Last Operation", 1, 1);
-		}
-		else if (CustomBlockID == ToggleWandBlock) {
-			selectionWandEnabled = !selectionWandEnabled;
-			wString messageText = (selectionWandEnabled) ? L"Selection Wand Enabled" : L"Selection Wand Disabled";
-			SpawnHintText(GetBlockAbove(At), messageText, 1, 1);
 		}
 		else if (CustomBlockID == RedoBlock) {
 			RedoLastOperation();
@@ -434,8 +445,17 @@ void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::ws
 			CutRegion();
 			SpawnHintText(GetBlockAbove(At), L"Cutting Selected Region.", 1, 1);
 		}
-		else if (CustomBlockID == PasteBlock) {
-			PasteClipboard(At);
+		else if (CustomBlockID == ToggleWandBlock) {
+			selectionWandEnabled = !selectionWandEnabled;
+			if (selectionWandEnabled) exchangingWandEnabled = false;
+			wString messageText = (selectionWandEnabled) ? L"Selection Wand Enabled" : L"Selection Wand Disabled";
+			SpawnHintText(GetBlockAbove(At), messageText, 1, 1);
+		}
+		else if (CustomBlockID == ToggleExchangeBlock) {
+			exchangingWandEnabled = !exchangingWandEnabled;
+			if (exchangingWandEnabled) selectionWandEnabled = false;
+			wString messageText = (exchangingWandEnabled) ? L"Exchanging Wand Enabled" : L"Exchanging Wand Disabled";
+			SpawnHintText(GetBlockAbove(At), messageText, 1, 1);
 		}
 		else if (CustomBlockID == Rotate90CWBlock) {
 			RotateClipboard90DegreesClockwise();
@@ -445,14 +465,8 @@ void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::ws
 			RotateClipboard90DegreesCounterClockwise();
 			SpawnHintText(GetBlockAbove(At), L"Rotating Clipboard 90 degrees counterclockwise", 1, 1);
 		}
-		else if (CustomBlockID == PaletteBlock) {
-			BlockInfo painterBlock = GetBlock(At + CoordinateInBlocks(1, 0, 0));
-			if (painterBlock.CustomBlockID == PaintBlock) {
-				RemovePalette(At);
-			}
-			else {
-				TryGeneratePalette(At);
-			}
+		else if (CustomBlockID == PasteBlock) {
+			PasteClipboard(At);
 		}
 	}
 }
@@ -488,6 +502,15 @@ void Event_AnyBlockDestroyed(CoordinateInBlocks At, BlockInfo Type, bool Moved)
 
 void Event_AnyBlockHitByTool(CoordinateInBlocks At, BlockInfo Type, wString ToolName)
 {
+	if (exchangingWandEnabled) {
+		if (ToolName == L"T_Arrow") {
+			exchangeTarget = Type;
+		}
+		if (ToolName == L"T_Pickaxe_Stone" || ToolName == L"T_Axe_Stone") {
+			SetBlock(At, exchangeTarget);
+		}
+	}
+
 	if (selectionWandEnabled) {
 		if (ToolName == L"T_Pickaxe_Stone") {
 			SpawnHintText(At + CoordinateInBlocks(0, 0, 1), L"Marker 1 set!", 1, 1);

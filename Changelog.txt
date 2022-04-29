@@ -1,5 +1,11 @@
-Version 0.1.2 Change Log
+Version 0.1.3 Changelog
+- You can now Undo up to your last 5 paint operations
+- You can now Redo up to your last 5 undos.
+- New Feature: The Exchanging wand. Select a block with your bow and then replace any blocks you
+hit with your Stone Pickaxe or Stone Axe with that selected block.
+
+Version 0.1.2 Changelog
 - Most Command blocks now provide hint text feedback when triggering them.
 - You can now trigger the Paste block by shooting it with your bow.
-- You can now undo and redo up to 5 paint operations
 - Updated to the latest cyubeVR Beta
+
