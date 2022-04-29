@@ -152,9 +152,40 @@ bool BlockIsMaskTarget(BlockInfo info, std::list<BlockInfo> mask) {
 	return false;
 }
 
+// Undo Methods
+//********************************
+void AddRedoOperation(const PaintOperation& paintOp) {
+	if (redoHistory.size() >= UndoHistoryLength) {
+		redoHistory.pop_back();
+	}
+	redoHistory.push_front(paintOp);
+}
+void AddUndoOperation(const PaintOperation& paintOp) {
+	if (undoHistory.size() >= UndoHistoryLength) {
+		undoHistory.pop_back();
+	}
+	undoHistory.push_front(paintOp);
+}
+
+void UndoLastOperation() {
+	if (undoHistory.empty()) return;
+
+	PaintOperation paintOp = undoHistory.front();
+	AddRedoOperation(paintOp.ExecutePaint());
+	undoHistory.pop_front();
+}
+
+void RedoLastOperation() {
+	if (redoHistory.empty()) return;
+
+	PaintOperation paintOp = redoHistory.front();
+	AddUndoOperation(paintOp.ExecutePaint());
+	redoHistory.pop_front();
+}
+
 // Paint Methods
 //********************************
-bool Paint(PaintOperation paintOp, BlockInfo originalBlock, BlockInfo newBlock, CoordinateInBlocks At) {
+bool Paint(PaintOperation& paintOp, BlockInfo originalBlock, BlockInfo newBlock, CoordinateInBlocks At) {
 	paintOp.paintedBlocks.push_front(Block(originalBlock, At));
 	return SetBlock(At, newBlock);
 }
@@ -234,39 +265,7 @@ void PaintArea() {
 			}
 		}
 	}
-}
-
-// Undo Methods
-//********************************
-void AddRedoOperation(PaintOperation paintOp) {
-	if (redoHistory.size() > UndoHistoryLength) {
-		redoHistory.pop_back();
-	}
-	redoHistory.push_front(paintOp);
-}
-void AddUndoOperation(PaintOperation paintOp) {
-	if (undoHistory.size() > UndoHistoryLength) {
-		undoHistory.pop_back();
-	}
-	undoHistory.push_front(paintOp);
-}
-
-void UndoLastOperation() {
-	if (undoHistory.empty()) return;
-	
-	PaintOperation paintOp = undoHistory.front();
-	undoHistory.pop_front();
-
-	AddRedoOperation(paintOp.ExecutePaint());
-}
-
-void RedoLastOperation() {
-	if (redoHistory.empty()) return;
-
-	PaintOperation paintOp = redoHistory.front();
-	redoHistory.pop_front();
-
-	AddUndoOperation(paintOp.ExecutePaint());
+	AddUndoOperation(paintOp);
 }
 
 // Clipboard Method
@@ -321,6 +320,7 @@ void CutRegion() {
 			}
 		}
 	}
+	AddUndoOperation(paintOp);
 }
 
 void PasteClipboard(CoordinateInBlocks At) {
@@ -342,6 +342,7 @@ void PasteClipboard(CoordinateInBlocks At) {
 		BlockInfo currentBlock = GetBlock(At + it->location);
 		Paint(paintOp, currentBlock, it->blockInfo, At + it->location);
 	}
+	AddUndoOperation(paintOp);
 }
 
 void RotateClipboard90DegreesClockwise() {
