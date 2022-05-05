@@ -4,8 +4,9 @@
 /************************************************************
 	Config Variables (Set these to whatever you need. They are automatically read by the game.)
 *************************************************************/
-float TickRate = 1;
+float TickRate = 5;
 const int UndoHistoryLength = 5;
+const int MarkerRange = 100;
 
 // Unique Mod IDS
 //********************************
@@ -55,6 +56,43 @@ struct PaintOperation {
 		return PaintOperation(reverseOperation);
 	}
 };
+struct CommandNode {
+	BlockInfo originalBlock;
+	CoordinateInBlocks location;
+
+	void RestoreBlock() {
+		SetBlock(location, originalBlock);
+	}
+};
+struct MarkerNode {
+	BlockInfo originalBlock;
+	CoordinateInBlocks location;
+	bool isMarker1;
+	bool isVisible;
+
+	bool PlayerIsInRange() {
+		CoordinateInBlocks playerLocation = GetPlayerLocation();
+		int64_t distanceX = playerLocation.X - location.X;
+		int64_t distanceY = playerLocation.Y - location.Y;
+		int16_t distanceZ = playerLocation.Z - location.Z;
+		
+		int64_t distance = sqrt((distanceX * distanceX) + (distanceY * distanceY) + (distanceZ * distanceZ));
+		return distance <= MarkerRange;
+	}
+	
+	void RestoreBlock() {
+		SetBlock(location, originalBlock);
+	}
+
+	void RestoreMarker() {
+		if (isMarker1) {
+			SetBlock(location, Marker1Block);
+		}
+		else {
+			SetBlock(location, Marker2Block);
+		}
+	}
+};
 
 // State Variables
 //********************************
@@ -72,6 +110,7 @@ std::list<Block> clipboard;
 
 int64_t clipboardWidth;
 int64_t clipboardLength;
+int16_t clipboardHeight;
 
 BlockInfo exchangeTarget(EBlockType::Air);
 
@@ -284,6 +323,7 @@ void CopyRegion() {
 
 	clipboardWidth = endCorner.X - startCorner.X;
 	clipboardLength = endCorner.Y - startCorner.Y;
+	clipboardHeight = endCorner.Z - startCorner.Z;
 
 	for (int16_t z = startCorner.Z; z <= endCorner.Z; z++) {
 
@@ -311,6 +351,7 @@ void CutRegion() {
 
 	clipboardWidth = endCorner.X - startCorner.X;
 	clipboardLength = endCorner.Y - startCorner.Y;
+	clipboardHeight = endCorner.Z - startCorner.Z;
 
 	for (int16_t z = startCorner.Z; z <= endCorner.Z; z++) {
 
@@ -374,6 +415,30 @@ void RotateClipboard90DegreesCounterClockwise() {
 	int64_t width = clipboardWidth;
 	clipboardWidth = clipboardLength;
 	clipboardLength = width;
+}
+
+void MirrorClipboardX() {
+	std::list<Block>::iterator it;
+	for (it = clipboard.begin(); it != clipboard.end(); it++) {
+		int64_t y = it->location.Y *-1;
+		it->location = CoordinateInBlocks(it->location.X, y + clipboardLength, it->location.Z);
+	}
+}
+
+void MirrorClipboardY() {
+	std::list<Block>::iterator it;
+	for (it = clipboard.begin(); it != clipboard.end(); it++) {
+		int64_t x = it->location.X * -1;
+		it->location = CoordinateInBlocks(x + clipboardWidth, it->location.Y, it->location.Z);
+	}
+}
+
+void MirrorClipboardZ() {
+	std::list<Block>::iterator it;
+	for (it = clipboard.begin(); it != clipboard.end(); it++) {
+		int64_t z = it->location.Z * -1;
+		it->location = CoordinateInBlocks(it->location.X, it->location.Y, z+clipboardHeight);
+	}
 }
 
 /************************************************************* 
