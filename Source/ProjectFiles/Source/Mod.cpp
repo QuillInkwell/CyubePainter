@@ -142,7 +142,7 @@ bool TryGeneratePalette(CoordinateInBlocks At) {
 		for (int x = 0; x <= 7; x++) {
 			BlockInfo currentBlock = GetBlock(At + CoordinateInBlocks(x, 0, z));
 			if (currentBlock.Type != EBlockType::Air) {
-				SpawnHintText( GetPlayerLocation(), L"No space for palette here!", 1, 1);
+				SpawnHintText( At + CoordinateInBlocks(0,0,1), L"No space for palette here!", 1, 1);
 				return false;
 			}
 		}

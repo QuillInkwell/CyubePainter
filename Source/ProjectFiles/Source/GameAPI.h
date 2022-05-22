@@ -54,16 +54,20 @@ using namespace ModAPI;
 	void SpawnHintText(CoordinateInCentimeters At, const wString& Text, float DurationInSeconds, float SizeMultiplier = 1, float SizeMultiplierVertical = 1);
 
 /*
-*	Returns the current player location
+*	Returns the current player location (feet location).
 */
 	CoordinateInCentimeters GetPlayerLocation();
 
 /*
-*	Sets the player location. Be careful with this, if you set it to something far away, the only way for the player to ever get back to their base would
-*	probably be to kill themselves
+*	Sets the player location (feet location). Be careful with this, if you set it to something far away, the only way for the player to ever get back to their base would
+*	probably be to kill themselves.
 */
-	void SetPlayerLocation(CoordinateInCentimeters To);
+	bool SetPlayerLocation(CoordinateInCentimeters To);
 
+/*
+*	Returns the current player location (head location).
+*/
+	CoordinateInCentimeters GetPlayerLocationHead();
 
 /*
 *	Returns the current player view direction as a unit vector.
@@ -73,9 +77,73 @@ using namespace ModAPI;
 	DirectionVectorInCentimeters GetPlayerViewDirection();
 
 /*
+*	Returns the current location of the hand of the player.
+*/
+	CoordinateInCentimeters GetHandLocation(bool LeftHand);
+
+/*
+*	Returns the current location of the tip of the index finger of the player.
+*/
+	CoordinateInCentimeters GetIndexFingerTipLocation(bool LeftHand);
+
+/*
+*	Spawn a block item (a small cube you can craft with etc).
+*/
+	void SpawnBlockItem(CoordinateInCentimeters At, BlockInfo Type);
+
+/*
+*	Add one or multiple items to the inventory. 
+*/
+	void AddToInventory(BlockInfo Type, int Amount);
+
+/*
+*	Remove one or multiple items from the inventory. 
+*/
+	void RemoveFromInventory(BlockInfo Type, int Amount);
+
+/*
 *	Get the name of the currently loaded world.
 */
 	wString GetWorldName();
+
+/*
+*	Get the current time of day. Returns a float between 0 and 2400. 0 and 2400 are the identical time, midnight. 1200 is mid-day.
+*/
+	float GetTimeOfDay();
+
+/*
+*	Set the current time of day. A float between 0 and 2400, same format as returned by GetTimeOfDay().
+*/
+	void SetTimeOfDay(float NewTime);
+
+/*
+*	A simple function to return if it's currently night in the world.
+*/
+	bool IsCurrentlyNight();
+
+/*
+*	Play haptic feedback on one of the motion controllers.
+*/
+	void PlayHapticFeedbackOnHand(bool LeftHand, float DurationSeconds, float Frequency, float Amplitude);
+
+/*
+*	Spawn a UE4 BP Mod Actor. This makes it possible to spawn custom particle effects, sound effects, and really anything that UE4 can spawn.
+*
+*	To learn how to create such a UE4 BP Actor, take a look at this playlist: https://www.youtube.com/playlist?list=PL6kr-0TUTN58n8QrQoFVq4JI-HZj4eDbY
+*/
+	void SpawnBPModActor(CoordinateInCentimeters At, const wString& ModName, const wString& ActorName);
+
+/*
+*	Save a persistent string to the save files of the currently active world, that you can later load using LoadModDataString.
+*/
+	void SaveModDataString(wString ModName, wString StringIn);
+
+/*
+*	Load a string you previously saved using SaveModDataString.
+*/
+	bool LoadModDataString(wString ModName, wString& StringOut);
+
+
 
 /*
 *	Returns a random bool with a certain chance to be TRUE. This function is very fast (~5 CPU cycles).
@@ -97,3 +165,12 @@ using namespace ModAPI;
 
 	// Returns an array of all coordinates in a certain radius around a specific coordinate
 	std::vector<CoordinateInBlocks> GetAllCoordinatesInRadius(CoordinateInBlocks At, int32_t Radius);
+
+	// Returns the path where this mod is installed
+	const wString& GetThisModFolderPath();
+
+/*
+*	Get a handle to memory you want to share between multiple different mods. 
+*	The handle automatically aquires a lock on the memory for thread safety, and releases it when going out of scope.
+*/
+	ScopedSharedMemoryHandle GetSharedMemoryPointer(wString Key, bool CreateIfNotExist, bool WaitUntilExist);
