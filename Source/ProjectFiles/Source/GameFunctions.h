@@ -9,6 +9,8 @@
 #include <random>
 #include <limits>
 
+#include <type_traits>
+
 namespace ModAPI {
 
 	enum class EBlockType : uint8_t {
@@ -122,16 +124,30 @@ namespace ModAPI {
 		None
 	};
 
-	struct CoordinateInCentimetersC {
-		int64_t X;
-		int64_t Y;
-		uint16_t Z;
+	struct GameVersion {
+		uint32_t MajorVersion;
+		uint32_t MinorVersion;
+		bool IsBetaBuild;
 	};
 
-	struct DirectionVectorInCentimetersC {
-		float X;
-		float Y;
-		float Z;
+	struct SharedMemoryHandleC {
+		void** Pointer;
+		wchar_t* Key;
+		bool Valid;
+	};
+
+	struct ScopedSharedMemoryHandle {
+		void*& Pointer;
+		wchar_t* Key;
+		bool Valid;
+
+		ScopedSharedMemoryHandle(const SharedMemoryHandleC& i) : Pointer(*i.Pointer), Key(i.Key), Valid(i.Valid) {}			
+
+		~ScopedSharedMemoryHandle(); // Declared here, defined in GameAPI.cpp
+
+		ScopedSharedMemoryHandle(ScopedSharedMemoryHandle&&) = delete;
+		ScopedSharedMemoryHandle(const ScopedSharedMemoryHandle& i) = delete;
+		ScopedSharedMemoryHandle& operator=(const ScopedSharedMemoryHandle& i) = delete;
 	};
 
 	struct CoordinateInCentimeters;
@@ -156,26 +172,17 @@ namespace ModAPI {
 			return (X == i.X && Y == i.Y && Z == i.Z);
 		}
 
-		operator CoordinateInCentimetersC()
-		{ 
-			CoordinateInCentimetersC Value;
-			Value.X = X;
-			Value.Y = Y;
-			Value.Z = Z;
-			return Value;
-		}
-
 		std::wstring ToString() const {
 			return L"X=" + std::to_wstring(X) + L" Y=" + std::to_wstring(Y) + L" Z=" + std::to_wstring(Z);
 		}
 
 		constexpr CoordinateInCentimeters() : X(0), Y(0), Z(0) {}
 		constexpr CoordinateInCentimeters(int64_t X_, int64_t Y_, uint16_t Z_) : X(X_), Y(Y_), Z(Z_) {}
-		constexpr CoordinateInCentimeters(const CoordinateInCentimetersC C) : X(C.X), Y(C.Y), Z(C.Z) {};
 
 		constexpr CoordinateInCentimeters(CoordinateInBlocks CIB);
 
 	};
+	static_assert(std::is_standard_layout<CoordinateInCentimeters>());
 
 	struct CoordinateInBlocks {
 
@@ -217,6 +224,7 @@ namespace ModAPI {
 		constexpr CoordinateInBlocks(CoordinateInCentimeters CIM);
 
 	};
+	static_assert(std::is_standard_layout<CoordinateInBlocks>());
 
 	struct DirectionVectorInCentimeters {
 
@@ -242,15 +250,6 @@ namespace ModAPI {
 
 		std::wstring ToString() const {
 			return L"X=" + std::to_wstring(X) + L" Y=" + std::to_wstring(Y) + L" Z=" + std::to_wstring(Z);
-		}
-
-		operator DirectionVectorInCentimetersC()
-		{
-			DirectionVectorInCentimetersC Value;
-			Value.X = X;
-			Value.Y = Y;
-			Value.Z = Z;
-			return Value;
 		}
 
 		operator CoordinateInCentimeters()
@@ -282,12 +281,12 @@ namespace ModAPI {
 
 	typedef uint32_t UniqueID;
 
-	struct BlockInfo
+	struct BlockInfo 
 	{
 
-		EBlockType Type;
-		ERotation Rotation;			// Only used for torches
-		UniqueID CustomBlockID;		// Only used if the Type is EBlockType::ModBlock
+		EBlockType Type = EBlockType::Invalid;
+		ERotation Rotation;							// Only used for torches
+		UniqueID CustomBlockID = 0;					// Only used if the Type is EBlockType::ModBlock
 
 		constexpr BlockInfo() : Type(EBlockType::Invalid), Rotation(ERotation::None), CustomBlockID(0) {}
 
@@ -299,48 +298,108 @@ namespace ModAPI {
 
 		constexpr BlockInfo(EBlockType Type_, ERotation Rotation_, UniqueID CustomBlockID_) : Type(Type_), Rotation(Rotation_), CustomBlockID(CustomBlockID_) {}
 
+		bool IsValid() {
+			return Type != EBlockType::Invalid;
+		}
 	};
+	static_assert(std::is_standard_layout<BlockInfo>());
 
-	struct BlockInfoC {
-		EBlockType Type;
-		ERotation Rotation;
-		UniqueID CustomBlockID;
-	};
 
 	typedef void (*Log_T)(const wchar_t* String);
 
-	typedef BlockInfoC(*GetBlock_T)(CoordinateInBlocks At);
-
-	typedef bool (*SetBlock_T)(CoordinateInBlocks At, BlockInfo BlockType);
+	typedef BlockInfo (*GetBlock_T)(const ModAPI::CoordinateInBlocks& At);
+	typedef bool (*SetBlock_T)(const ModAPI::CoordinateInBlocks& At, const ModAPI::BlockInfo& BlockType, ModAPI::BlockInfo& OutReplacedType);
 
 	typedef void (*SpawnHintText_T)(ModAPI::CoordinateInCentimeters At, const wchar_t* Text, float DurationInSeconds, float SizeMultiplier, float SizeMultiplierVertical);
+	
+	typedef ModAPI::CoordinateInCentimeters (*GetPlayerLocation_T)();
+	typedef bool (*SetPlayerLocation_T)(ModAPI::CoordinateInCentimeters To);
 
-	typedef ModAPI::CoordinateInCentimetersC(*GetPlayerLocation_T)();
+	typedef ModAPI::CoordinateInCentimeters(*GetPlayerLocationHead_T)();
 
-	typedef ModAPI::DirectionVectorInCentimetersC(*GetPlayerViewDirection_T)();
+	typedef ModAPI::DirectionVectorInCentimeters (*GetPlayerViewDirection_T)();
+
+	typedef ModAPI::CoordinateInCentimeters (*GetHandLocation_T)(bool LeftHand);
+
+	typedef ModAPI::CoordinateInCentimeters (*GetIndexFingerTipLocation_T)(bool LeftHand);
+
+	typedef void (*SpawnBlockItem_T)(ModAPI::CoordinateInCentimeters At, ModAPI::BlockInfo Type);
+
+	typedef void (*AddToInventory_T)(ModAPI::BlockInfo Type, uint32_t Amount);
+	typedef void (*RemoveFromInventory_T)(ModAPI::BlockInfo Type, uint32_t Amount);
 
 	typedef const wchar_t* (*GetWorldName_T)();
 
+	typedef float (*GetTimeOfDay_T)();
+	typedef void (*SetTimeOfDay_T)(float NewTime);
+
+	typedef void (*PlayHapticFeedbackOnHand_T)(bool LeftHand, float DurationSeconds, float Frequency, float Amplitude);
+
+	typedef float (*GetPlayerHealth_T)();
+	typedef float (*SetPlayerHealth_T)(float NewHealth, bool Offset);
+
+	typedef void (*SpawnBPModActor_T)(ModAPI::CoordinateInCentimeters At, const wchar_t* ModName, const wchar_t* ActorName);
+
+	typedef void (*SaveModDataString_T)(const wchar_t* ModName, const wchar_t* StringIn);
+	typedef bool (*LoadModDataString_T)(const wchar_t* ModName, wchar_t*& StringOut);
+
+	typedef void (*SaveModData_T)(const wchar_t* ModName, uint8_t* Data, uint64_t ArraySize);
+	typedef uint8_t* (*LoadModData_T)(const wchar_t* ModName, uint64_t* ArraySizeOut);
+
+	typedef void (*GetThisModSaveFolderPath_T) (const wchar_t* ModName, wchar_t* PathOut);
+	typedef ModAPI::GameVersion (*GetGameVersionNumber_T) ();
+
+	typedef SharedMemoryHandleC (*GetSharedMemoryPointer_T)(const wchar_t* Key, bool CreateIfNotExist, bool WaitUntilExist);
+	typedef void (*ReleaseSharedMemoryPointer_T)(ModAPI::SharedMemoryHandleC& Handle);
+
+
 	namespace InternalFunctions {
 
-		inline Log_T I_Log;
+		#define InternalFunction(FunctionName) inline FunctionName##_T I_##FunctionName
 
-		inline GetBlock_T I_GetBlock;
+		InternalFunction(Log);
 
-		inline SetBlock_T I_SetBlock;
+		InternalFunction(GetBlock);
+		InternalFunction(SetBlock);
 
-		inline SpawnHintText_T I_SpawnHintText;
+		InternalFunction(SpawnHintText);
 
-		inline GetPlayerLocation_T I_GetPlayerLocation;
+		InternalFunction(GetPlayerLocation);
+		InternalFunction(SetPlayerLocation);
 
-		inline GetPlayerViewDirection_T I_GetPlayerViewDirection;
+		InternalFunction(GetPlayerLocationHead);
+		InternalFunction(GetPlayerViewDirection);
+		InternalFunction(GetHandLocation);
+		InternalFunction(GetIndexFingerTipLocation);
 
-		inline GetWorldName_T I_GetWorldName;
+		InternalFunction(SpawnBlockItem);
+
+		InternalFunction(AddToInventory);
+		InternalFunction(RemoveFromInventory);
+
+		InternalFunction(GetWorldName);
+
+		InternalFunction(GetTimeOfDay);
+		InternalFunction(SetTimeOfDay);
+
+		InternalFunction(PlayHapticFeedbackOnHand);
+
+		InternalFunction(GetPlayerHealth);
+		InternalFunction(SetPlayerHealth);
+
+		InternalFunction(SpawnBPModActor);
+
+		InternalFunction(SaveModDataString);
+		InternalFunction(LoadModDataString);
+		InternalFunction(SaveModData);
+		InternalFunction(LoadModData);
+
+		InternalFunction(GetThisModSaveFolderPath);
+		InternalFunction(GetGameVersionNumber);
+
+		InternalFunction(GetSharedMemoryPointer);
+		InternalFunction(ReleaseSharedMemoryPointer);
 
 	}
-
-
-
-
 
 }

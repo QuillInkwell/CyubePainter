@@ -41,16 +41,19 @@ struct Block {
 	}
 };
 struct PaintOperation {
-	std::list<Block> paintedBlocks;
+	std::vector<Block> paintedBlocks;
 
 	PaintOperation ExecutePaint() {
-		std::list<Block> reverseOperation;
+		std::vector<Block> reverseOperation;
 
-		std::list<Block>::iterator it;
-		for (it = paintedBlocks.begin(); it != paintedBlocks.end(); it++) {
-			BlockInfo currentBlock = GetBlock(it->location);
-			reverseOperation.push_front(Block(currentBlock, it->location));
-			SetBlock(it->location, it->blockInfo);
+
+		for (int i = 0; i <= paintedBlocks.size(); i++) {
+			reverseOperation.push_back(
+				Block(
+				GetAndSetBlock(paintedBlocks[i].location, paintedBlocks[i].blockInfo),
+				paintedBlocks[i].location
+				)
+			);
 		}
 		return PaintOperation(reverseOperation);
 	}
@@ -68,7 +71,7 @@ bool exchangingWandEnabled = false;
 
 std::list<PaintOperation> undoHistory;
 std::list<PaintOperation> redoHistory;
-std::list<Block> clipboard;
+std::vector<Block> clipboard;
 
 int64_t clipboardWidth;
 int64_t clipboardLength;
@@ -100,10 +103,10 @@ CoordinateInBlocks GetBlockAbove(CoordinateInBlocks At) {
 //********************************
 bool TryGeneratePalette(CoordinateInBlocks At) {
 	for (int z = 0; z <= 2; z++) {
-		for (int x = 0; x <= 7; x++) {
+		for (int x = 0; x <= 6; x++) {
 			BlockInfo currentBlock = GetBlock(At + CoordinateInBlocks(x, 0, z));
 			if (currentBlock.Type != EBlockType::Air) {
-				SpawnHintText( GetPlayerLocation(), L"No space for palette here!", 1, 1);
+				SpawnHintText( At + CoordinateInBlocks(0,0,1), L"No space for palette here!", 1, 1);
 				return false;
 			}
 		}
@@ -137,19 +140,19 @@ void RemovePalette(CoordinateInBlocks At) {
 
 // Masking Methods
 //********************************
-std::list<BlockInfo> GetMaskBlocks()
+std::vector<BlockInfo> GetMaskBlocks()
 {
-	std::list<BlockInfo> maskBlocks;
+	std::vector<BlockInfo> maskBlocks;
 	BlockInfo block = GetBlock(maskCord + CoordinateInBlocks(0, 0, 1));
 	int i = 1;
 	while (block.Type != EBlockType::Air) {
-		maskBlocks.push_front(block);
+		maskBlocks.push_back(block);
 		i++;
 		block = GetBlock(maskCord + CoordinateInBlocks(0, 0, i));
 	}
 	return maskBlocks;
 }
-bool BlockIsMaskTarget(BlockInfo info, std::list<BlockInfo> mask) {
+bool BlockIsMaskTarget(BlockInfo info, std::vector<BlockInfo> mask) {
 	for (BlockInfo maskInfo : mask) {
 		if (maskInfo.CustomBlockID == AirFilter && info.Type == EBlockType::Air)
 			return true;
@@ -192,13 +195,14 @@ void RedoLastOperation() {
 
 // Paint Methods
 //********************************
-bool Paint(PaintOperation& paintOp, BlockInfo originalBlock, BlockInfo newBlock, CoordinateInBlocks At) {
-	paintOp.paintedBlocks.push_front(Block(originalBlock, At));
-	return SetBlock(At, newBlock);
+void Paint(PaintOperation& paintOp, BlockInfo newBlock, CoordinateInBlocks At) {
+	paintOp.paintedBlocks.push_back(
+		Block(GetAndSetBlock(At, newBlock), At)
+	);
 }
 
 bool MarkersInLoadedChunks() {
-	if (GetBlock(marker1Cord).Type == EBlockType::Invalid) {
+	if (!GetBlock(marker1Cord).IsValid()) {
 		SpawnHintText(
 			GetPlayerLocation(),
 			L"Marker 1 Not Found",
@@ -208,7 +212,7 @@ bool MarkersInLoadedChunks() {
 		);
 		return false;
 	}
-	if (GetBlock(marker2Cord).Type == EBlockType::Invalid) {
+	if (!GetBlock(marker2Cord).IsValid()) {
 		SpawnHintText(
 			GetPlayerLocation(),
 			L"Marker 2 Not Found",
@@ -222,7 +226,7 @@ bool MarkersInLoadedChunks() {
 }
 
 BlockInfo SetPaintTarget() {
-	if (GetBlock(paintCord).Type == EBlockType::Invalid) {
+	if (!GetBlock(paintCord).IsValid()) {
 		SpawnHintText(
 			GetPlayerLocation(),
 			L"Paint Block Not Found",
@@ -239,16 +243,16 @@ BlockInfo SetPaintTarget() {
 
 void PaintArea() {
 	bool useMask = false;
-	std::list<BlockInfo> maskBlocks;
+	std::vector<BlockInfo> maskBlocks;
 	PaintOperation paintOp;
 
 	if (!MarkersInLoadedChunks()) return;
 
 	BlockInfo targetBlock = SetPaintTarget();
-	if (targetBlock.Type == EBlockType::Invalid) return;
+	if (!targetBlock.IsValid()) return;
 
 	// Set the block mask if one exists
-	if (!(GetBlock(maskCord).Type == EBlockType::Invalid)) {
+	if ((GetBlock(maskCord).IsValid())) {
 		maskBlocks = GetMaskBlocks();
 		if (!(maskBlocks.empty())) {
 			useMask = true;
@@ -268,7 +272,7 @@ void PaintArea() {
 				if (useMask && !(BlockIsMaskTarget(currentBlock, maskBlocks)) ) {
 					continue;
 				}
-				Paint(paintOp, currentBlock, targetBlock, CoordinateInBlocks(x, y, z));
+				Paint(paintOp, targetBlock, CoordinateInBlocks(x, y, z));
 			}
 		}
 	}
@@ -295,7 +299,7 @@ void CopyRegion() {
 				int16_t localZ = z - startCorner.Z;
 				BlockInfo currentBlock = GetBlock(CoordinateInBlocks(x, y, z));
 
-				clipboard.push_front(Block(currentBlock, CoordinateInBlocks(localX, localY, localZ)));
+				clipboard.push_back(Block(currentBlock, CoordinateInBlocks(localX, localY, localZ)));
 			}
 		}
 	}
@@ -322,8 +326,8 @@ void CutRegion() {
 				int16_t localZ = z - startCorner.Z;
 				BlockInfo currentBlock = GetBlock(CoordinateInBlocks(x, y, z));
 
-				clipboard.push_front(Block(currentBlock, CoordinateInBlocks(localX, localY, localZ)));
-				Paint(paintOp,currentBlock, EBlockType::Air, CoordinateInBlocks(x, y, z));
+				clipboard.push_back(Block(currentBlock, CoordinateInBlocks(localX, localY, localZ)));
+				Paint(paintOp, EBlockType::Air, CoordinateInBlocks(x, y, z));
 			}
 		}
 	}
@@ -338,26 +342,21 @@ void PasteClipboard(CoordinateInBlocks At) {
 	BlockInfo blockAbove = GetBlock(GetBlockAbove(At));
 	if (blockAbove.CustomBlockID == AirFilter) {
 		ignoreAirBlocks = true;
-		Paint(paintOp, BlockInfo(PasteBlock), EBlockType::Air, At);
-		Paint(paintOp, blockAbove, EBlockType::Air, At + CoordinateInBlocks(0, 0, 1));
 	}
 
-	std::list<Block>::iterator it;
-	for (it = clipboard.begin(); it != clipboard.end(); it++) {
-		if (ignoreAirBlocks && it->blockInfo.Type == EBlockType::Air) continue;
+	for (int i = 0; i <= clipboard.size(); i++) {
+		if (ignoreAirBlocks && clipboard[i].blockInfo.Type == EBlockType::Air) continue;
 
-		BlockInfo currentBlock = GetBlock(At + it->location);
-		Paint(paintOp, currentBlock, it->blockInfo, At + it->location);
+		Paint(paintOp, clipboard[i].blockInfo, At + clipboard[i].location);
 	}
 	AddUndoOperation(paintOp);
 }
 
 void RotateClipboard90DegreesClockwise() {
-	std::list<Block>::iterator it;
-	for (it = clipboard.begin(); it != clipboard.end(); it++) {
-		int64_t x = it->location.Y;
-		int64_t y = it->location.X * -1;
-		it->location = CoordinateInBlocks(x, y+clipboardWidth, it->location.Z);
+	for (int i = 0; i <= clipboard.size(); i++) {
+		int64_t x = clipboard[i].location.Y;
+		int64_t y = clipboard[i].location.X * -1;
+		clipboard[i].location = CoordinateInBlocks(x, y+clipboardWidth, clipboard[i].location.Z);
 	}
 	int64_t width = clipboardWidth;
 	clipboardWidth = clipboardLength;
@@ -365,11 +364,10 @@ void RotateClipboard90DegreesClockwise() {
 }
 
 void RotateClipboard90DegreesCounterClockwise() {
-	std::list<Block>::iterator it;
-	for (it = clipboard.begin(); it != clipboard.end(); it++) {
-		int64_t x = it->location.Y * -1;
-		int64_t y = it->location.X;
-		it->location = CoordinateInBlocks(x+clipboardLength, y, it->location.Z);
+	for (int i = 0; i <= clipboard.size(); i++) {
+		int64_t x = clipboard[i].location.Y * -1;
+		int64_t y = clipboard[i].location.X;
+		clipboard[i].location = CoordinateInBlocks(x+clipboardLength, y, clipboard[i].location.Z);
 	}
 	int64_t width = clipboardWidth;
 	clipboardWidth = clipboardLength;
@@ -407,7 +405,7 @@ void Event_BlockDestroyed(CoordinateInBlocks At, UniqueID CustomBlockID, bool Mo
 	}
 }
 
-void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, std::wstring ToolName)
+void Event_BlockHitByTool(CoordinateInBlocks At, UniqueID CustomBlockID, wString ToolName, CoordinateInCentimeters ExactHitLocation, bool ToolHeldByHandLeft)
 {
 	if (ToolName == L"T_Arrow") {
 		if (CustomBlockID == PasteBlock) {
@@ -500,7 +498,7 @@ void Event_AnyBlockDestroyed(CoordinateInBlocks At, BlockInfo Type, bool Moved)
 
 }
 
-void Event_AnyBlockHitByTool(CoordinateInBlocks At, BlockInfo Type, wString ToolName)
+void Event_AnyBlockHitByTool(CoordinateInBlocks At, BlockInfo Type, wString ToolName, CoordinateInCentimeters ExactHitLocation, bool ToolHeldByHandLeft)
 {
 	if (exchangingWandEnabled) {
 		if (ToolName == L"T_Arrow") {
