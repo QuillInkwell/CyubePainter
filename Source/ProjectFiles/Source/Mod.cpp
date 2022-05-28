@@ -47,7 +47,7 @@ struct PaintOperation {
 		std::vector<Block> reverseOperation;
 
 
-		for (int i = 0; i <= paintedBlocks.size(); i++) {
+		for (int i = 0; i < paintedBlocks.size(); i++) {
 			reverseOperation.push_back(
 				Block(
 				GetAndSetBlock(paintedBlocks[i].location, paintedBlocks[i].blockInfo),
@@ -344,7 +344,7 @@ void PasteClipboard(CoordinateInBlocks At) {
 		ignoreAirBlocks = true;
 	}
 
-	for (int i = 0; i <= clipboard.size(); i++) {
+	for (int i = 0; i < clipboard.size(); i++) {
 		if (ignoreAirBlocks && clipboard[i].blockInfo.Type == EBlockType::Air) continue;
 
 		Paint(paintOp, clipboard[i].blockInfo, At + clipboard[i].location);
@@ -353,7 +353,7 @@ void PasteClipboard(CoordinateInBlocks At) {
 }
 
 void RotateClipboard90DegreesClockwise() {
-	for (int i = 0; i <= clipboard.size(); i++) {
+	for (int i = 0; i < clipboard.size(); i++) {
 		int64_t x = clipboard[i].location.Y;
 		int64_t y = clipboard[i].location.X * -1;
 		clipboard[i].location = CoordinateInBlocks(x, y+clipboardWidth, clipboard[i].location.Z);
@@ -364,7 +364,7 @@ void RotateClipboard90DegreesClockwise() {
 }
 
 void RotateClipboard90DegreesCounterClockwise() {
-	for (int i = 0; i <= clipboard.size(); i++) {
+	for (int i = 0; i < clipboard.size(); i++) {
 		int64_t x = clipboard[i].location.Y * -1;
 		int64_t y = clipboard[i].location.X;
 		clipboard[i].location = CoordinateInBlocks(x+clipboardLength, y, clipboard[i].location.Z);
