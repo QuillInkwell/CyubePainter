@@ -103,7 +103,7 @@ CoordinateInBlocks GetBlockAbove(CoordinateInBlocks At) {
 //********************************
 bool TryGeneratePalette(CoordinateInBlocks At) {
 	for (int z = 0; z <= 2; z++) {
-		for (int x = 0; x <= 6; x++) {
+		for (int x = 1; x <= 6; x++) {
 			BlockInfo currentBlock = GetBlock(At + CoordinateInBlocks(x, 0, z));
 			if (currentBlock.Type != EBlockType::Air) {
 				SpawnHintText( At + CoordinateInBlocks(0,0,1), L"No space for palette here!", 1, 1);
@@ -279,6 +279,10 @@ void PaintArea() {
 	AddUndoOperation(paintOp);
 }
 
+void StackArea() {
+	DirectionVectorInCentimeters viewDirection = GetPlayerViewDirection();
+}
+
 // Clipboard Method
 //********************************
 void CopyRegion() {
@@ -401,7 +405,10 @@ void Event_BlockDestroyed(CoordinateInBlocks At, UniqueID CustomBlockID, bool Mo
 		maskCord = CoordinateInBlocks(0, 0, 0);
 	}
 	if (CustomBlockID == PaletteBlock) {
-		RemovePalette(At);
+		BlockInfo painterBlock = GetBlock(At + CoordinateInBlocks(1, 0, 0));
+		if (painterBlock.CustomBlockID == PaintBlock) {
+			RemovePalette(At);
+		}
 	}
 }
 
